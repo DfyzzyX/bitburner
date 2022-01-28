@@ -105,10 +105,10 @@ export async function main(ns) {
 
 	//User Defined Parameters start
 	var currentCity = 'Sector-12'; //Current city from your Bladeburner interface (default = 'Sector-12')
-	var boChance = 0.75; //default =
-	var opChance = 0.75; //default = 
-	var cChance = 0.75; //default = 
-	var cityChaos = 3;
+	var boChance = 0.55; //default = 0.7
+	var opChance = 0.55; //default = 0.7
+	var cChance = 0.55; //default = 0.7
+	var cityChaos = 3; //default = 3
 	//User Defined Parameters end
 
 	const chances = (t, n, c) => evalChances(t, n, c);
@@ -245,7 +245,7 @@ export async function main(ns) {
 		if (availOps.length == 0) {
 			return investigationO;
 		} else {
-			return availOps[0];
+			return availOps[availOps.length - 1];
 		}
 
 	}
@@ -268,7 +268,7 @@ export async function main(ns) {
 		if (availContracts.length == 0) {
 			return trackingC;
 		} else {
-			return availContracts[0];
+			return availContracts[availContracts.length - 1];
 		}
 	}
 
@@ -334,8 +334,9 @@ export async function main(ns) {
 			}
 
 			default: {
-				// plan.push([typeGA, trainigGA, 10]);
 				plan.push([typeBO, currentActiveBO, 1]);
+				let action = findBestAvailOp();
+				plan.push([typeO, action, 10]);
 			}
 		}
 		planLog = plan.map((x) => x);
@@ -349,34 +350,39 @@ export async function main(ns) {
 
 	function implementPlan() {
 		spendSkillPoints();
-		timeForStep = calculateTime(plan[0][0], plan[0][1]);
-		switch (plan[0][0]) {
-			case (typeBO): {
-				findActiveBO();
-				doBO();
-				break;
-			}
-			case (typeO): {
-				doOps(plan[0][1]);
-				break;
-			}
-			case (typeC): {
-				doContracts(plan[0][1]);
-				break;
-			}
-			case (typeGA): {
-				ns.bladeburner.startAction(plan[0][0], plan[0][1]);
-				break;
-			}
-			default: {
-				ns.print('Unknown action');
-			}
-		}
-
-		if (plan[0][2] == 1) {
-			plan.shift();
+		if (plan.length == 0) {
+			timeToImpl = 0;
+			timeForStep = 0;
 		} else {
-			plan[0][2]--;
+			timeForStep = calculateTime(plan[0][0], plan[0][1]);
+			switch (plan[0][0]) {
+				case (typeBO): {
+					findActiveBO();
+					doBO();
+					break;
+				}
+				case (typeO): {
+					doOps(plan[0][1]);
+					break;
+				}
+				case (typeC): {
+					doContracts(plan[0][1]);
+					break;
+				}
+				case (typeGA): {
+					ns.bladeburner.startAction(plan[0][0], plan[0][1]);
+					break;
+				}
+				default: {
+					ns.print('Unknown action');
+				}
+			}
+
+			if (plan[0][2] == 1) {
+				plan.shift();
+			} else {
+				plan[0][2]--;
+			}
 		}
 	}
 
@@ -390,48 +396,60 @@ export async function main(ns) {
 	function doBO() {
 		if (chances(typeBO, currentActiveBO, boChance)) {
 			if (!ns.bladeburner.startAction(typeBO, currentActiveBO)) {
+				ns.print(`Unable to start action ${currentActiveBO} of type ${typeBO} reason low rank`);
 				currentProblem = 'rank';
 				currentProblemSourceType = typeBO;
 				timeToImpl = 0;
+				timeForStep = 0;
 			} else {
 				ns.print(`Started action ${currentActiveBO} of type ${typeBO}`);
 			}
 		} else {
+			ns.print(`Unable to start action ${currentActiveBO} of type ${typeBO} reason low chance`);
 			currentProblem = 'chance';
 			currentProblemSourceType = typeBO;
 			timeToImpl = 0;
+			timeForStep = 0;
 		}
 	}
 
 	function doOps(availOp) {
 		if (chances(typeO, availOp, opChance)) {
 			if (!ns.bladeburner.startAction(typeO, availOp)) {
+				ns.print(`Unable to start action ${availOp} of type ${typeO} reason low action count`);
 				currentProblem = 'noAvailNonGAction';
 				currentProblemSourceType = typeO;
 				timeToImpl = 0;
+				timeForStep = 0;
 			} else {
 				ns.print(`Started action ${availOp} of type ${typeO}`);
 			}
 		} else {
+			ns.print(`Unable to start action ${availOp} of type ${typeO} reason low chance`);
 			currentProblem = 'chance';
 			currentProblemSourceType = typeO;
 			timeToImpl = 0;
+			timeForStep = 0;
 		}
 	}
 
 	function doContracts(availContract) {
 		if (chances(typeC, availContract, cChance)) {
 			if (!ns.bladeburner.startAction(typeC, availContract)) {
+				ns.print(`Unable to start action ${availContract} of type ${typeC} reason low action count`);
 				currentProblem = 'noAvailNonGAction';
 				currentProblemSourceType = typeC;
 				timeToImpl = 0;
+				timeForStep = 0;
 			} else {
 				ns.print(`Started action ${availContract} of type ${typeC}`);
 			}
 		} else {
+			ns.print(`Unable to start action ${availContract} of type ${typeC} reason low chance`);
 			currentProblem = 'chance';
 			currentProblemSourceType = typeC;
 			timeToImpl = 0;
+			timeForStep = 0;
 		}
 	}
 
@@ -442,7 +460,6 @@ export async function main(ns) {
 		}
 		cycle[0]++;
 		ns.clearLog();
-
 		ns.print('╔═══╦══════════════════════════╦════════╗');
 		ns.print(`║ ${cycle[cycle[0]]} ║ PLANED ACTION            ║ CYCLES ║`);
 		let i = 1;
